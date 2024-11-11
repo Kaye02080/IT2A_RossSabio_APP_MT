@@ -107,34 +107,38 @@ public class IT2A_Rosssabio {
             conn.setAutoCommit(true);  // Reset auto-commit
         }
     }
+private static void updateBalance(Connection conn, Scanner scanner) throws SQLException {
+    // Get account name and new balance from the user
+    System.out.print("Enter account name: ");
+    String name = scanner.next();
 
-    private static void updateBalance(Connection conn, Scanner scanner) throws SQLException {
-        System.out.print("Enter account name: ");
-        String name = scanner.next();
+    System.out.print("Enter new balance: ");
+    double newBalance = scanner.nextDouble();
 
-        System.out.print("Enter new balance: ");
-        double newBalance = scanner.nextDouble();
-
-        if (newBalance < 0) {
-            System.out.println("Balance cannot be negative.");
-            return;
-        }
-
-        String updateRecord = "UPDATE accounts SET balance = ? WHERE name = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(updateRecord)) {
-            stmt.setDouble(1, newBalance);
-            stmt.setString(2, name);
-            int rowsAffected = stmt.executeUpdate();
-
-            if (rowsAffected > 0) {
-                System.out.println("Balance updated successfully for " + name);
-            } else {
-                System.out.println("Account not found.");
-            }
-        }
-       String sql = "INSERT INTO Account(MR_SenderID, MR_RecipientName, MR_Amount, MR_Balance) VALUES (?, ?, ?, ?)";
-       config updateBalance = config.updateBalance(sql, sender, recipient, amount, balance);
+    // Ensure that the new balance is non-negative
+    if (newBalance < 0) {
+        System.out.println("Balance cannot be negative.");
+        return;
     }
+
+    // SQL query to update the balance
+    String updateRecord = "UPDATE accounts SET balance = ? WHERE name = ?";
+
+    // Prepare and execute the update statement
+    try (PreparedStatement stmt = conn.prepareStatement(updateRecord)) {
+        stmt.setDouble(1, newBalance);  // Set the new balance
+        stmt.setString(2, name);         // Set the account name
+
+        // Execute the update and check how many rows were affected
+        int rowsAffected = stmt.executeUpdate();
+
+        if (rowsAffected > 0) {
+            System.out.println("Balance updated successfully for " + name);
+        } else {
+            System.out.println("Account not found.");
+        }
+    }
+}
 
     private static void deleteAccount(Connection conn, Scanner scanner) throws SQLException {
         System.out.print("Enter account ID to delete: ");
