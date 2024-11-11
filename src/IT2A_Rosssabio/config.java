@@ -1,10 +1,13 @@
 package IT2A_Rosssabio;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 public class config {
     
@@ -168,7 +171,50 @@ public void deleteRecord(String sql, Object... values) {
         System.out.println("Error deleting record: " + e.getMessage());
     }
 }
-    
+  
+
+private static void viewTransactionHistory(Connection conn) throws SQLException {
+    String query = "SELECT t.transaction_id, a1.name AS sender, a2.name AS recipient, t.amount, t.transaction_date "
+                 + "FROM transactions t "
+                 + "JOIN accounts a1 ON t.sender_id = a1.id "
+                 + "JOIN accounts a2 ON t.recipient_id = a2.id "
+                 + "ORDER BY t.transaction_date DESC"; // Add ordering for better clarity
+
+    try (PreparedStatement stmt = conn.prepareStatement(query);
+         ResultSet rs = stmt.executeQuery()) {
+
+        System.out.println("Transaction History:");
+        if (!rs.next()) {
+            System.out.println("No transactions found.");
+            return; // No transactions
+        }
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); // Customize the format
+
+        do {
+            int transactionId = rs.getInt("transaction_id");
+            String sender = rs.getString("sender");
+            String recipient = rs.getString("recipient");
+            double amount = rs.getDouble("amount");
+            String rawDate = rs.getString("transaction_date");
+
+            // Convert raw date string to Date and format it
+            try {
+                Date transactionDate = (Date) dateFormat.parse(rawDate);
+                String formattedDate = dateFormat.format(transactionDate);
+                System.out.println("Transaction ID: " + transactionId 
+                                   + ", Sender: " + sender 
+                                   + ", Recipient: " + recipient 
+                                   + ", Amount: $" + amount 
+                                   + ", Date: " + formattedDate);
+            } catch (ParseException e) {
+                System.out.println("Error formatting date: " + rawDate);
+            }
+
+        } while (rs.next());
+    }
+}
+
     
 }
 
