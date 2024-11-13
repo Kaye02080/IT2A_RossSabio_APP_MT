@@ -8,44 +8,48 @@ public class IT2A_Rosssabio {
 
     public static void main(String[] args) {
         try (Connection conn = connect()) {
-            // Ensure required tables exist
+
             createTablesIfNotExists(conn);
 
             Scanner scanner = new Scanner(System.in);
             while (true) {
                 System.out.println("Money Remittance System");
-                System.out.println("1. Send Money");
-                System.out.println("2. Check Balance");
-                System.out.println("3. Update Balance");
-                System.out.println("4. Delete Account");
-                System.out.println("5. View All Accounts");
-                System.out.println("6. View Transaction History");
-                System.out.println("7. Exit");
+                System.out.println("1. Add Account");
+                System.out.println("2. Send Money");
+                System.out.println("3. Check Balance");
+                System.out.println("4. Update Balance");
+                System.out.println("5. Delete Account");
+                System.out.println("6. View All Accounts");
+                System.out.println("7. View Transaction History");
+                System.out.println("8. Exit");
 
                 System.out.print("Select an option: ");
                 int choice = scanner.nextInt();
-                scanner.nextLine();  // Clear the newline character
+                scanner.nextLine();  
 
                 switch (choice) {
                     case 1:
-                        sendMoney(conn, scanner);
+                        addAccount(conn, scanner); 
                         break;
                     case 2:
-                        checkBalance(conn, scanner);
+                        sendMoney(conn, scanner);
                         break;
                     case 3:
-                        updateBalance(conn, scanner);
+                        checkBalance(conn, scanner);
                         break;
                     case 4:
-                        deleteAccount(conn, scanner);
+                        updateBalance(conn, scanner);
                         break;
                     case 5:
-                        viewAllAccounts(conn);
+                        deleteAccount(conn, scanner);
                         break;
                     case 6:
-                        viewTransactionHistory(conn);
+                        viewAllAccounts(conn);
                         break;
                     case 7:
+                        viewTransactionHistory(conn);
+                        break;
+                    case 8:
                         System.out.println("Exiting...");
                         return;
                     default:
@@ -54,6 +58,38 @@ public class IT2A_Rosssabio {
             }
         } catch (SQLException e) {
             System.out.println("Database connection error: " + e.getMessage());
+        }
+    }
+
+    // Add account method
+    private static void addAccount(Connection conn, Scanner scanner) throws SQLException {
+        System.out.print("Enter account name: ");
+        String name = scanner.nextLine().trim();
+
+        // Check if the account already exists
+        String checkQuery = "SELECT COUNT(*) FROM accounts WHERE name = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(checkQuery)) {
+            stmt.setString(1, name);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    System.out.println("Account with this name already exists.");
+                    return;
+                }
+            }
+        }
+
+        // Insert new account into the database with a balance of 0.0
+        String insertQuery = "INSERT INTO accounts (name, balance) VALUES (?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(insertQuery)) {
+            stmt.setString(1, name);
+            stmt.setDouble(2, 0.0);  // New accounts start with a balance of 0.0
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                System.out.println("Account created successfully for " + name);
+            } else {
+                System.out.println("Failed to create account.");
+            }
         }
     }
 
@@ -89,6 +125,20 @@ public class IT2A_Rosssabio {
                                         + "FOREIGN KEY (recipient_id) REFERENCES accounts(id))";
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(createTransactionsTable);
+        }
+    }
+
+    private static double getBalance(Connection conn, String accountName) throws SQLException {
+        String query = "SELECT balance FROM accounts WHERE name = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, accountName);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("balance");
+                } else {
+                    return -1; // Account not found
+                }
+            }
         }
     }
 
@@ -158,9 +208,18 @@ public class IT2A_Rosssabio {
                 System.out.println("Transaction successful. " + amount + " sent from " + sender + " to " + recipient);
 
                 // Ask if the user wants to perform another transaction
-                System.out.print("Would you like to perform another transaction? (yes/no): ");
-                String response = scanner.nextLine().trim().toLowerCase();
-                if (!response.equals("yes")) {
+                String response = "";
+                while (true) {
+                    System.out.print("Would you like to perform another transaction? (yes/no): ");
+                    response = scanner.nextLine().trim().toLowerCase();
+                    if (response.equals("yes") || response.equals("no")) {
+                        break;  // Exit the loop if the response is valid
+                    } else {
+                        System.out.println("Invalid response. Please enter 'yes' or 'no'.");
+                    }
+                }
+
+                if (response.equals("no")) {
                     System.out.println("Exiting transaction process.");
                     break;  // Exit the loop and method
                 }
@@ -174,104 +233,59 @@ public class IT2A_Rosssabio {
         }
     }
 
-    private static double getBalance(Connection conn, String name) throws SQLException {
-        String query = "SELECT balance FROM accounts WHERE name = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(query)) {
-            stmt.setString(1, name);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                return rs.getDouble("balance");
-            } else {
-                createAccount(conn, name);  // Create the account if it doesn't exist
-                return 0.0;
-            }
-        }
-    }
-
-    private static void createAccount(Connection conn, String name) throws SQLException {
-        String insertAccount = "INSERT INTO accounts (name, balance) VALUES (?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(insertAccount)) {
-            stmt.setString(1, name);
-            stmt.setDouble(2, 0.0);  // Set initial balance to 0
-            stmt.executeUpdate();
-            System.out.println("Account for " + name + " created with initial balance of $0.00");
-        }
-    }
-
     private static void viewAllAccounts(Connection conn) throws SQLException {
         String query = "SELECT id, name, balance FROM accounts";
         try (PreparedStatement stmt = conn.prepareStatement(query);
              ResultSet rs = stmt.executeQuery()) {
 
             System.out.println("Accounts and Balances:");
-            while (rs.next()) {
-                int id = rs.getInt("id");
-                String name = rs.getString("name");
-                double balance = rs.getDouble("balance");
-                System.out.println("ID: " + id + ", Name: " + name + ", Balance: $" + balance);
+            if (!rs.next()) {
+                System.out.println("No accounts found.");
+            } else {
+                do {
+                    System.out.println("ID: " + rs.getInt("id") + ", Name: " + rs.getString("name") + ", Balance: " + rs.getDouble("balance"));
+                } while (rs.next());
             }
         }
     }
 
-    private static void viewTransactionHistory(Connection conn) throws SQLException {
-        String query = "SELECT t.transaction_id, a1.name AS sender, a2.name AS recipient, t.amount, t.transaction_date "
-                     + "FROM transactions t "
-                     + "JOIN accounts a1 ON t.sender_id = a1.id "
-                     + "JOIN accounts a2 ON t.recipient_id = a2.id "
-                     + "ORDER BY t.transaction_date DESC";  // Add ordering for better clarity
-
-        try (PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-
-            System.out.println("Transaction History:");
-            if (!rs.next()) {
-                System.out.println("No transactions found.");
-                return; // No transactions
-            }
-            do {
-                int transactionId = rs.getInt("transaction_id");
-                String sender = rs.getString("sender");
-                String recipient = rs.getString("recipient");
-                double amount = rs.getDouble("amount");
-                String date = rs.getString("transaction_date");
-                System.out.println("Transaction ID: " + transactionId 
-                                   + ", Sender: " + sender 
-                                   + ", Recipient: " + recipient 
-                                   + ", Amount: $" + amount 
-                                   + ", Date: " + date);
-            } while (rs.next());
+    private static void checkBalance(Connection conn, Scanner scanner) throws SQLException {
+        System.out.print("Enter account name: ");
+        String accountName = scanner.nextLine().trim();
+        double balance = getBalance(conn, accountName);
+        if (balance == -1) {
+            System.out.println("Account not found.");
+        } else {
+            System.out.println("Balance for " + accountName + ": " + balance);
         }
     }
 
     private static void updateBalance(Connection conn, Scanner scanner) throws SQLException {
         System.out.print("Enter account name: ");
-        String name = scanner.nextLine().trim();
+        String accountName = scanner.nextLine().trim();
 
         double newBalance = 0;
         while (true) {
             System.out.print("Enter new balance: ");
             try {
                 newBalance = Double.parseDouble(scanner.nextLine());
-                if (newBalance < 0) {
-                    System.out.println("Balance cannot be negative.");
-                } else {
+                if (newBalance >= 0) {
                     break;
+                } else {
+                    System.out.println("Balance cannot be negative. Try again.");
                 }
             } catch (NumberFormatException e) {
                 System.out.println("Invalid input. Please enter a valid number.");
             }
         }
 
-        String updateRecord = "UPDATE accounts SET balance = ? WHERE name = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(updateRecord)) {
+        String updateQuery = "UPDATE accounts SET balance = ? WHERE name = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
             stmt.setDouble(1, newBalance);
-            stmt.setString(2, name);
-
+            stmt.setString(2, accountName);
             int rowsAffected = stmt.executeUpdate();
-
             if (rowsAffected > 0) {
-                System.out.println("Balance updated successfully for " + name);
+                System.out.println("Balance updated successfully for " + accountName);
             } else {
                 System.out.println("Account not found.");
             }
@@ -280,30 +294,41 @@ public class IT2A_Rosssabio {
 
     private static void deleteAccount(Connection conn, Scanner scanner) throws SQLException {
         System.out.print("Enter account name to delete: ");
-        String name = scanner.nextLine().trim();
+        String accountName = scanner.nextLine().trim();
 
         String deleteQuery = "DELETE FROM accounts WHERE name = ?";
         try (PreparedStatement stmt = conn.prepareStatement(deleteQuery)) {
-            stmt.setString(1, name);
+            stmt.setString(1, accountName);
             int rowsAffected = stmt.executeUpdate();
-
             if (rowsAffected > 0) {
-                System.out.println("Account deleted successfully.");
+                System.out.println("Account " + accountName + " deleted successfully.");
             } else {
                 System.out.println("Account not found.");
             }
         }
     }
 
-    private static void checkBalance(Connection conn, Scanner scanner) throws SQLException {
-        System.out.print("Enter account name: ");
-        String name = scanner.nextLine().trim();
+    private static void viewTransactionHistory(Connection conn) throws SQLException {
+        String query = "SELECT t.transaction_id, t.sender_id, t.recipient_id, t.amount, t.transaction_date, "
+                     + "s.name AS sender_name, r.name AS recipient_name "
+                     + "FROM transactions t "
+                     + "JOIN accounts s ON t.sender_id = s.id "
+                     + "JOIN accounts r ON t.recipient_id = r.id";
+        try (PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
 
-        double balance = getBalance(conn, name);
-        if (balance >= 0) {
-            System.out.println(name + "'s balance: $" + balance);
-        } else {
-            System.out.println("Account not found.");
+            System.out.println("Transaction History:");
+            if (!rs.next()) {
+                System.out.println("No transactions found.");
+            } else {
+                do {
+                    System.out.println("Transaction ID: " + rs.getInt("transaction_id")
+                            + ", Sender: " + rs.getString("sender_name")
+                            + ", Recipient: " + rs.getString("recipient_name")
+                            + ", Amount: " + rs.getDouble("amount")
+                            + ", Date: " + rs.getString("transaction_date"));
+                } while (rs.next());
+            }
         }
     }
 }
