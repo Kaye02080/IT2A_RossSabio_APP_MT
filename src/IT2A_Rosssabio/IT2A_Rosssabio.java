@@ -143,95 +143,108 @@ public class IT2A_Rosssabio {
     }
 
     private static void sendMoney(Connection conn, Scanner scanner) throws SQLException {
+    while (true) {
+        System.out.print("Enter sender's name: ");
+        String sender = scanner.nextLine().trim(); // Trim extra spaces
+
+        System.out.print("Enter recipient's name: ");
+        String recipient = scanner.nextLine().trim(); // Trim extra spaces
+
+        double amount = 0;
         while (true) {
-            System.out.print("Enter sender's name: ");
-            String sender = scanner.nextLine().trim();
-
-            System.out.print("Enter recipient's name: ");
-            String recipient = scanner.nextLine().trim();
-
-            double amount = 0;
-            while (true) {
-                System.out.print("Enter amount to send: ");
-                try {
-                    amount = Double.parseDouble(scanner.nextLine());
-                    if (amount <= 0) {
-                        System.out.println("Amount must be greater than zero.");
-                    } else {
-                        break;
-                    }
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Please enter a valid number.");
-                }
-            }
-
-            conn.setAutoCommit(false);  // Begin transaction
-
+            System.out.print("Enter amount to send: ");
             try {
-                double senderBalance = getBalance(conn, sender);
-                if (senderBalance < amount) {
-                    System.out.println("Insufficient funds.");
-                    conn.rollback();  // Rollback the transaction in case of failure
-                    return;
+                amount = Double.parseDouble(scanner.nextLine());
+                if (amount <= 0) {
+                    System.out.println("Amount must be greater than zero.");
+                } else {
+                    break;
                 }
-
-                double recipientBalance = getBalance(conn, recipient);
-
-                // Update sender's balance
-                String updateSender = "UPDATE accounts SET balance = ? WHERE name = ?";
-                try (PreparedStatement stmt = conn.prepareStatement(updateSender)) {
-                    stmt.setDouble(1, senderBalance - amount);  // Deduct the amount from sender's balance
-                    stmt.setString(2, sender);
-                    stmt.executeUpdate();
-                }
-
-                // Update recipient's balance
-                String updateRecipient = "UPDATE accounts SET balance = ? WHERE name = ?";
-                try (PreparedStatement stmt = conn.prepareStatement(updateRecipient)) {
-                    stmt.setDouble(1, recipientBalance + amount);  // Add the amount to recipient's balance
-                    stmt.setString(2, recipient);
-                    stmt.executeUpdate();
-                }
-
-                // Insert transaction record
-                String insertTransaction = "INSERT INTO transactions (sender_id, recipient_id, amount, transaction_date) "
-                        + "SELECT (SELECT id FROM accounts WHERE name = ?), "
-                        + "(SELECT id FROM accounts WHERE name = ?), ?, CURRENT_TIMESTAMP";
-                try (PreparedStatement stmt = conn.prepareStatement(insertTransaction)) {
-                    stmt.setString(1, sender);
-                    stmt.setString(2, recipient);
-                    stmt.setDouble(3, amount);
-                    stmt.executeUpdate();
-                }
-
-                conn.commit();
-                System.out.println("Transaction successful. " + amount + " sent from " + sender + " to " + recipient);
-
-                // Ask if the user wants to perform another transaction
-                String response = "";
-                while (true) {
-                    System.out.print("Would you like to perform another transaction? (yes/no): ");
-                    response = scanner.nextLine().trim().toLowerCase();
-                    if (response.equals("yes") || response.equals("no")) {
-                        break;  // Exit the loop if the response is valid
-                    } else {
-                        System.out.println("Invalid response. Please enter 'yes' or 'no'.");
-                    }
-                }
-
-                if (response.equals("no")) {
-                    System.out.println("Exiting transaction process.");
-                    break;  // Exit the loop and method
-                }
-            } catch (SQLException e) {
-                conn.rollback();  // Rollback the transaction in case of any error
-                System.out.println("Transaction failed. Rolled back.");
-                e.printStackTrace();
-            } finally {
-                conn.setAutoCommit(true);  // Reset auto-commit
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a valid number.");
             }
         }
+
+        conn.setAutoCommit(false); // Begin transaction
+
+        try {
+            // Get sender's balance
+            double senderBalance = getBalance(conn, sender);
+            if (senderBalance == -1) {
+                System.out.println("Sender account not found.");
+                conn.rollback();  // Rollback the transaction in case of failure
+                return;
+            }
+            if (senderBalance < amount) {
+                System.out.println("Insufficient funds.");
+                conn.rollback();  // Rollback the transaction in case of failure
+                return;
+            }
+
+            // Get recipient's balance
+            double recipientBalance = getBalance(conn, recipient);
+            if (recipientBalance == -1) {
+                System.out.println("Recipient account not found.");
+                conn.rollback();  // Rollback the transaction in case of failure
+                return;
+            }
+
+            // Update sender's balance
+            String updateSender = "UPDATE accounts SET balance = ? WHERE LOWER(name) = LOWER(?)";  // Ensure case-insensitive match
+            try (PreparedStatement stmt = conn.prepareStatement(updateSender)) {
+                stmt.setDouble(1, senderBalance - amount);  // Deduct the amount from sender's balance
+                stmt.setString(2, sender);
+                stmt.executeUpdate();
+            }
+
+            // Update recipient's balance
+            String updateRecipient = "UPDATE accounts SET balance = ? WHERE LOWER(name) = LOWER(?)";  // Ensure case-insensitive match
+            try (PreparedStatement stmt = conn.prepareStatement(updateRecipient)) {
+                stmt.setDouble(1, recipientBalance + amount);  // Add the amount to recipient's balance
+                stmt.setString(2, recipient);
+                stmt.executeUpdate();
+            }
+
+            // Insert transaction record
+            String insertTransaction = "INSERT INTO transactions (sender_id, recipient_id, amount, transaction_date) "
+                    + "SELECT (SELECT id FROM accounts WHERE LOWER(name) = LOWER(?)), "
+                    + "(SELECT id FROM accounts WHERE LOWER(name) = LOWER(?)), ?, CURRENT_TIMESTAMP";
+            try (PreparedStatement stmt = conn.prepareStatement(insertTransaction)) {
+                stmt.setString(1, sender);
+                stmt.setString(2, recipient);
+                stmt.setDouble(3, amount);
+                stmt.executeUpdate();
+            }
+
+            conn.commit(); // Commit the transaction
+            System.out.println("Transaction successful. " + amount + " sent from " + sender + " to " + recipient);
+
+            // Ask if the user wants to perform another transaction
+            String response = "";
+            while (true) {
+                System.out.print("Would you like to perform another transaction? (yes/no): ");
+                response = scanner.nextLine().trim().toLowerCase();
+                if (response.equals("yes") || response.equals("no")) {
+                    break; // Proceed if valid response
+                } else {
+                    System.out.println("Invalid response. Please enter 'yes' or 'no'.");
+                }
+            }
+
+            if (response.equals("no")) {
+                System.out.println("Exiting transaction process.");
+                break; // Exit the loop and method
+            }
+        } catch (SQLException e) {
+            conn.rollback();  // Rollback the transaction in case of any error
+            System.out.println("Transaction failed. Rolled back.");
+            e.printStackTrace();
+        } finally {
+            conn.setAutoCommit(true);  // Reset auto-commit mode
+        }
     }
+}
+
 
     private static void viewAllAccounts(Connection conn) throws SQLException {
         String query = "SELECT id, name, balance FROM accounts";
