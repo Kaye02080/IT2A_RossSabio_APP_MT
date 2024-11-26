@@ -118,4 +118,29 @@ public class Account {
             }
         }
     }
+    public static void viewAllAccounts(Connection conn) throws SQLException {
+    String query = "SELECT * FROM accounts";
+    try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+        System.out.println("\n--- All Accounts ---");
+        System.out.printf("%-20s %-30s %-5s %-15s %-10s%n", "Name", "Address", "Age", "Contact Number", "Balance");
+        System.out.println("--------------------------------------------------------------------------");
+
+        boolean hasAccounts = false;
+        while (rs.next()) {
+            hasAccounts = true;
+            String name = rs.getString("name");
+            String address = rs.getString("address");
+            int age = rs.getInt("age");
+            String contactNumber = rs.getString("contact_number");
+            double balance = rs.getDouble("balance");
+
+            System.out.printf("%-20s %-30s %-5d %-15s %-10.2f%n", name, address, age, contactNumber, balance);
+        }
+
+        if (!hasAccounts) {
+            System.out.println("No accounts found.");
+        }
+    }
+}
+
 }
