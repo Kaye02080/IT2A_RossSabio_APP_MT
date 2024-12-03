@@ -19,8 +19,19 @@ public class IT2A_Rosssabio {
                     System.out.println("3. View Transaction History");
                     System.out.println("4. Individual Report");
                     System.out.println("5. Exit");
-                    System.out.print("Enter your choice: ");
-                    int choice = Integer.parseInt(scanner.nextLine());
+
+                    int choice = -1; // Default invalid value
+                    while (choice == -1) {
+                        System.out.print("Enter your choice: ");
+                        String input = scanner.nextLine();
+                        
+                        // Validate input
+                        if (input.matches("\\d+")) { // Checks if input contains only digits
+                            choice = Integer.parseInt(input);
+                        } else {
+                            System.out.println("Invalid input. Please enter a number.");
+                        }
+                    }
 
                     switch (choice) {
                         case 1:
